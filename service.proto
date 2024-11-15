@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package sistema_finanza;
+
+// Messaggio di richiesta per la registrazione, l'aggiornamento e la cancellazione
+message UserRequest {
+    string email = 1;        // Email dell'utente
+    string ticker = 2;       // Ticker associato all'utente
+    string request_id = 3;   // ID unico per la richiesta
+}
+
+// Messaggio di risposta per le operazioni sugli utenti
+message UserResponse {
+    bool success = 1;        // Esito dell'operazione
+    string message = 2;      // Messaggio di risposta
+}
+
+// Messaggio di richiesta per la consultazione del valore azionario
+message StockRequest {
+    string email = 1;        // Email dell'utente
+}
+
+// Risposta con il valore azionario e timestamp
+message StockResponse {
+    string ticker = 1;       // Ticker associato all'utente
+    float value = 2;         // Valore dell'azione
+    string timestamp = 3;    // Timestamp del valore azionario
+}
+
+// Messaggio di richiesta per la consultazione della media dei valori azionari
+message StockAverageRequest {
+    string email = 1;        // Email dell'utente
+    int32 count = 2;         // Numero di record da considerare per il calcolo della media
+}
+
+// Risposta con la media del valore azionario
+message StockAverageResponse {
+    float average = 1;       // Media dei valori azionari
+}
+
+// Servizio per la gestione degli utenti
+service UserService {
+    rpc RegisterUser(UserRequest) returns (UserResponse);     // Registrazione utente
+    rpc UpdateUser(UserRequest) returns (UserResponse);        // Aggiornamento utente
+    rpc DeleteUser(UserRequest) returns (UserResponse);        // Eliminazione utente
+}
+
+// Servizio per la gestione dei valori azionari
+service StockService {
+    rpc GetLatestStockValue(StockRequest) returns (StockResponse);  // Ultimo valore azionario
+    rpc GetAverageStockValue(StockAverageRequest) returns (StockAverageResponse);  // Media dei valori azionari
+}

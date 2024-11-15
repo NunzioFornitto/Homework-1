@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  # Servizio MySQL
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_db
+    environment:
+      MYSQL_ROOT_PASSWORD: 1234           # Aggiungi la password per l'utente root
+      MYSQL_DATABASE: sistema_finanza     # Definisce il DB di default
+      MYSQL_USER: Admin                   # Crea l'utente Admin
+      MYSQL_PASSWORD: 1234             # La password per l'utente Admin
+    volumes:
+      - mysql_data:/var/lib/mysql         # Volume per i dati del DB
+      - ./db.sql:/docker-entrypoint-initdb.d/db.sql # Script di inizializzazione
+    networks:
+      - sistema_network
+
+  # Servizio server gRPC
+  server_grpc:
+    build:
+      context: ./server_grpc
+      dockerfile: Dockerfile.servergRPC
+    container_name: server_grpc
+    depends_on:
+      - mysql
+    ports:
+      - "50051:50051"  # Mappiamo solo la porta del server gRPC
+    networks:
+      - sistema_network
+
+  # Servizio DataCollector
+  data_collector:
+    build:
+      context: ./data_collector
+      dockerfile: Dockerfile.datacollector
+    container_name: data_collector
+    depends_on:
+      - mysql
+    networks:
+      - sistema_network
+    restart: always #prova sta cosa per fixare, se non va inserisci delay dentro datacollector e te ne esci
+
+networks:
+  sistema_network:
+    driver: bridge
+
+volumes:
+  mysql_data: {}
