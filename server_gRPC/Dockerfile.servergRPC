@@ -1,0 +1,19 @@
+# Usa una base image con Python
+FROM python:3.10-slim
+
+# Imposta la working directory all'interno del container
+WORKDIR /app
+
+# Copia il file requirements.txt per installare le dipendenze
+COPY requirements.txt .
+
+# Installa le dipendenze da requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copia i file Python e i file generati da gRPC nella cartella di lavoro
+COPY server_gRPC.py .
+COPY service_pb2.py .
+COPY service_pb2_grpc.py .
+
+# Imposta il comando di esecuzione del server gRPC
+CMD ["python", "server_gRPC.py"]
