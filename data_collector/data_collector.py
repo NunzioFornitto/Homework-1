@@ -76,7 +76,7 @@ def run_data_collector():
             try:
                 # Usa il circuito per chiamare get_stock_data in modo protetto
                 #Qui non si passano gli argomenti in get_stock_data perche' vengono passati in call
-                #la funzione call fatta nel circuit breaker è dinamica e permette di chiamare
+                #la funzione call fatta nel circuit breaker permette di chiamare
                 #qualsiasi funzione e passare gli argomenti "esternamente".
                 value, timestamp = circuit_breaker.call(get_stock_data, ticker)
                 save_stock_data(email, ticker, value)  
