@@ -23,7 +23,7 @@ def run():
 
         scelta = input("Inserisci la tua scelta (1-6): ")
 
-        # Genera un request_id univoco per ogni richiesta (non gestito dal server)
+        # Genero un request_id univoco per ogni richiesta (non gestito dal server)
         request_id = str(uuid.uuid4())
 
         if scelta == '1':

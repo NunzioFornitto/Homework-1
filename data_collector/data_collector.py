@@ -53,7 +53,7 @@ def send_alert_to_kafka():
         'timestamp': datetime.now(timezone(timedelta(0))).isoformat()
     }
     producer.produce(topic, json.dumps(message), callback=delivery_report)
-    producer.flush()  # Assicurati che il messaggio venga inviato
+    producer.flush()  
 
 def delivery_report(err, msg):
     """Callback per riportare il risultato della consegna del messaggio."""
@@ -69,7 +69,7 @@ def run_data_collector():
     quindi invia una notifica generica a Kafka.
     """
     while True:
-        # Recupera gli utenti dal database
+        # Recupero gli utenti dal database
         users = get_users_from_db()
         success_count = 0
 
@@ -81,7 +81,7 @@ def run_data_collector():
             email = user['email']
             ticker = user['ticker']
             
-            # Usa il Circuit Breaker per gestire il recupero dei dati da yfinance
+            # Uso il Circuit Breaker per gestire il recupero dei dati da yfinance
             try:
                 value, timestamp = circuit_breaker.call(get_stock_data, ticker)
                 save_stock_data(email, ticker, value)  
@@ -92,15 +92,15 @@ def run_data_collector():
             except Exception as e:
                 print(f"Errore durante il processo per {email}: {e}")
         
-        # Invia una notifica a Kafka se almeno un dato è stato aggiornato
+        # Invio una notifica a Kafka se almeno un dato è stato aggiornato
         if success_count > 0:
             send_alert_to_kafka()
         
-        # Aspetta 60 secondi prima di ripetere il processo
+        # Aspetto 60 secondi prima di ripetere il processo
         time.sleep(60)
 
 if __name__ == "__main__":
-    time.sleep(30)  # Aspetta 30 secondi prima di iniziare
+    time.sleep(30)  # Aspetto 30 secondi prima di iniziare (per il db)
     # Kafka configuration with custom settings
     producer_config = {
         'bootstrap.servers': 'kafka:9092',  # Kafka broker address
@@ -110,7 +110,7 @@ if __name__ == "__main__":
         'retries': 3  # Retry up to 3 times on failure
     }
 
-    # Crea il produttore Kafka
+    # Creo il produttore Kafka
     producer = Producer(producer_config)
     topic = 'to-alert-system'  # Topic per notificare il completamento
     run_data_collector()

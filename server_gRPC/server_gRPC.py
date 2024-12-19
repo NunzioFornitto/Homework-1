@@ -35,11 +35,11 @@ class UserService(service_pb2_grpc.UserServiceServicer):
         read_service = UserReadService()
         write_service = UserWriteService()
 
-        # Verifica se l'utente esiste già nel database
+        # Verifico se l'utente esiste già nel database
         if read_service.is_user_registered(request.email):
             return service_pb2.UserResponse(success=False, message="Utente già registrato nel database.")
 
-        # Crea il comando per registrare l'utente
+        # Creo il comando per registrare l'utente
         command = AddUserCommand(
             email=request.email,
             ticker=request.ticker,
@@ -50,7 +50,7 @@ class UserService(service_pb2_grpc.UserServiceServicer):
         try:
             write_service.handle_register_user(command)
 
-            # Aggiungi l'utente nella cache dopo averlo registrato
+            # Aggiungo l'utente nella cache dopo averlo registrato
             with cache_lock:
                 register_update_cache[request.email] = {
                     'ticker': request.ticker,
@@ -78,7 +78,7 @@ class UserService(service_pb2_grpc.UserServiceServicer):
             if not read_service.is_user_registered(request.email):
                 return service_pb2.UserResponse(success=False, message="Utente non trovato, registralo prima di aggiornarlo.")
 
-            # Crea il comando per aggiornare l'utente
+            # Creo il comando per aggiornare l'utente
             command = UpdateUserCommand(
                 email=request.email,
                 ticker=request.ticker,
@@ -88,7 +88,7 @@ class UserService(service_pb2_grpc.UserServiceServicer):
 
             write_service.handle_update_user(command)
 
-            # Aggiorna la cache con i nuovi valori
+            # Aggiorno la cache con i nuovi valori
             with cache_lock:
                 register_update_cache[request.email] = {
                     'ticker': request.ticker,
@@ -106,15 +106,15 @@ class UserService(service_pb2_grpc.UserServiceServicer):
         read_service = UserReadService()
         write_service = UserWriteService()
 
-        # Verifica se l'utente esiste
+        # Verifico se l'utente esiste
         if not read_service.is_user_registered(request.email):
             return service_pb2.UserResponse(success=False, message="Utente non trovato.")
             
-        # Cancella l'utente dalla tabella utenti
+        # Cancello l'utente dalla tabella utenti
         command = DeleteUserCommand(email=request.email)
         write_service.handle_delete_user(command)
         
-        # Rimuove l'utente anche dalle cache se presente
+        # Rimuovo l'utente anche dalle cache se presente
         with cache_lock:
            register_update_cache.pop(request.email, None)
         return service_pb2.UserResponse(success=True, message="Utente cancellato con successo.")
@@ -123,11 +123,11 @@ class UserService(service_pb2_grpc.UserServiceServicer):
 class StockService(service_pb2_grpc.StockServiceServicer):
 
     def GetLatestStockValue(self, request, context):
-        # Crea una query per recuperare l'ultimo valore dell'azione
+        # Creo una query per recuperare l'ultimo valore dell'azione
         query = GetLatestStockValueQuery(request.email)
         stock_read_service = StockReadService()
         
-        # Passa la query al servizio di lettura
+        # Passo la query al servizio di lettura
         ticker, value, timestamp = stock_read_service.get_latest_stock_value(query)
         
         if ticker:
@@ -136,11 +136,11 @@ class StockService(service_pb2_grpc.StockServiceServicer):
             return service_pb2.StockResponse(ticker="", value=0.0, timestamp="")
 
     def GetAverageStockValue(self, request, context):
-        # Crea una query per calcolare la media del valore delle azioni
+        # Creo una query per calcolare la media del valore delle azioni
         query = GetAverageStockValueQuery(request.email, request.count)
         stock_read_service = StockReadService()
         
-        # Passa la query al servizio di lettura
+        # Passo la query al servizio di lettura
         average_value = stock_read_service.get_average_stock_value(query)
         
         return service_pb2.StockAverageResponse(average=average_value)
