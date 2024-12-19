@@ -2,10 +2,10 @@ import grpc
 from concurrent import futures
 import time
 import mysql.connector
-from datetime import datetime
 import service_pb2
 import service_pb2_grpc
 import threading
+from cqrs import UserWriteService, AddUserCommand, UserReadService, UpdateUserCommand, GetLatestStockValueQuery, StockReadService, GetAverageStockValueQuery,DeleteUserCommand
 
 # Cache sia per aggiornamento che per cancellazione
 register_update_cache = {}
@@ -19,142 +19,131 @@ def get_db_connection():
         password="1234",
         database="sistema_finanza"
     )
+    
 # Implementazione del servizio UserService
 class UserService(service_pb2_grpc.UserServiceServicer):
 
     def RegisterUser(self, request, context):
         with cache_lock:  # Blocca l'accesso alla cache
             if request.email in register_update_cache:
-                return service_pb2.UserResponse(success=False, message="L'utente è già registrato con questo ticker.")
+                cached_user = register_update_cache[request.email]
+                if (cached_user['ticker'] == request.ticker and
+                        cached_user['high_value'] == request.high_value and
+                        cached_user['low_value'] == request.low_value):
+                    return service_pb2.UserResponse(success=False, message="L'utente è già registrato con questi parametri.")
 
-        # Connessione al database
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        read_service = UserReadService()
+        write_service = UserWriteService()
+
+        # Verifica se l'utente esiste già nel database
+        if read_service.is_user_registered(request.email):
+            return service_pb2.UserResponse(success=False, message="Utente già registrato nel database.")
+
+        # Crea il comando per registrare l'utente
+        command = AddUserCommand(
+            email=request.email,
+            ticker=request.ticker,
+            high_value=request.high_value,
+            low_value=request.low_value
+        )
 
         try:
-            # Verifica se l'utente esiste già nel database
-            cursor.execute("SELECT id_utente FROM utenti WHERE email = %s", (request.email,))
-            user_exists = cursor.fetchone()
+            write_service.handle_register_user(command)
 
-            if user_exists:
-                return service_pb2.UserResponse(success=False, message="Utente già registrato nel database.")
-
-            # Inserisce l'utente nel database
-            cursor.execute("INSERT INTO utenti (email, ticker) VALUES (%s, %s)", (request.email, request.ticker))
-            conn.commit()
-            #aggiungo l'utente nella cache dopo aver fatto la insert
+            # Aggiungi l'utente nella cache dopo averlo registrato
             with cache_lock:
-                register_update_cache[request.email] = request.ticker
+                register_update_cache[request.email] = {
+                    'ticker': request.ticker,
+                    'high_value': request.high_value,
+                    'low_value': request.low_value
+                }
+
             return service_pb2.UserResponse(success=True, message="Utente registrato con successo.")
-        finally:
-            cursor.close()
-            conn.close()
+        except Exception as e:
+            return service_pb2.UserResponse(success=False, message=f"Errore durante la registrazione: {str(e)}")
 
     def UpdateUser(self, request, context):
         with cache_lock:  # Blocca l'accesso alla cache
-            # Verifica se l'utente è presente nella cache e se il ticker è invariato
-            if request.email in register_update_cache and register_update_cache[request.email] == request.ticker:
-                return service_pb2.UserResponse(success=False, message="La richiesta di aggiornamento è già stata processata con questo ticker.")
+            if request.email in register_update_cache:
+                cached_user = register_update_cache[request.email]
+                if (cached_user['ticker'] == request.ticker and
+                        cached_user['high_value'] == request.high_value and
+                        cached_user['low_value'] == request.low_value):
+                    return service_pb2.UserResponse(success=False, message="La richiesta di aggiornamento è già stata processata con questi parametri.")
 
-        # Connessione al database
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        read_service = UserReadService()
+        write_service = UserWriteService()
 
         try:
-            # Verifica se l'utente esiste nel database
-            cursor.execute("SELECT id_utente FROM utenti WHERE email = %s", (request.email,))
-            user_exists = cursor.fetchone()
+            if not read_service.is_user_registered(request.email):
+                return service_pb2.UserResponse(success=False, message="Utente non trovato, registralo prima di aggiornarlo.")
 
-            if not user_exists:
-                return service_pb2.UserResponse(success=False, message="Utente non trovato, sei sicuro di averlo registrato? Registralo.")
-           
+            # Crea il comando per aggiornare l'utente
+            command = UpdateUserCommand(
+                email=request.email,
+                ticker=request.ticker,
+                high_value=request.high_value,
+                low_value=request.low_value
+            )
 
-            # Aggiorna il ticker nel database
-            updated_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            cursor.execute("UPDATE utenti SET ticker = %s, aggiornato_il = %s WHERE email = %s",
-                           (request.ticker, updated_at, request.email))
-            conn.commit()
-            #inserisco in cache l'utente aggiornato
+            write_service.handle_update_user(command)
+
+            # Aggiorna la cache con i nuovi valori
             with cache_lock:
-                register_update_cache[request.email] = request.ticker
+                register_update_cache[request.email] = {
+                    'ticker': request.ticker,
+                    'high_value': request.high_value,
+                    'low_value': request.low_value
+                }
 
             return service_pb2.UserResponse(success=True, message="Utente aggiornato con successo.")
-        finally:
-            cursor.close()
-            conn.close()
+        except Exception as e:
+            return service_pb2.UserResponse(success=False, message=f"Errore durante l'aggiornamento: {str(e)}")
 
 
     def DeleteUser(self, request, context):
-        # Connessione al database
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        
+        read_service = UserReadService()
+        write_service = UserWriteService()
 
         # Verifica se l'utente esiste
-        cursor.execute("SELECT id_utente FROM utenti WHERE email = %s", (request.email,))
-        user_exists = cursor.fetchone()
-
-        if not user_exists:
-            cursor.close()
-            conn.close()
+        if not read_service.is_user_registered(request.email):
             return service_pb2.UserResponse(success=False, message="Utente non trovato.")
-
+            
         # Cancella l'utente dalla tabella utenti
-        cursor.execute("DELETE FROM utenti WHERE email = %s", (request.email,))
-        conn.commit()
-
+        command = DeleteUserCommand(email=request.email)
+        write_service.handle_delete_user(command)
+        
         # Rimuove l'utente anche dalle cache se presente
         with cache_lock:
            register_update_cache.pop(request.email, None)
-
-        cursor.close()
-        conn.close()
-
         return service_pb2.UserResponse(success=True, message="Utente cancellato con successo.")
-
+    
 # Implementazione del servizio StockService
 class StockService(service_pb2_grpc.StockServiceServicer):
 
     def GetLatestStockValue(self, request, context):
-        # Connessione al database
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # Recupera l'ultimo valore del ticker dell'utente
-        cursor.execute("SELECT ticker, valore, time_stamp FROM azioni WHERE email = %s ORDER BY time_stamp DESC LIMIT 1", (request.email,))
-        result = cursor.fetchone()
-
-        if result:
-            ticker, valore, timestamp = result
-            # Converte il timestamp in una stringa
-            timestamp_str = timestamp.strftime("%Y-%m-%d %H:%M:%S") if isinstance(timestamp, datetime) else str(timestamp)
-            cursor.close()
-            conn.close()
-            return service_pb2.StockResponse(ticker=ticker, value=valore, timestamp=timestamp_str)
+        # Crea una query per recuperare l'ultimo valore dell'azione
+        query = GetLatestStockValueQuery(request.email)
+        stock_read_service = StockReadService()
+        
+        # Passa la query al servizio di lettura
+        ticker, value, timestamp = stock_read_service.get_latest_stock_value(query)
+        
+        if ticker:
+            return service_pb2.StockResponse(ticker=ticker, value=value, timestamp=timestamp)
         else:
-            cursor.close()
-            conn.close()
             return service_pb2.StockResponse(ticker="", value=0.0, timestamp="")
 
     def GetAverageStockValue(self, request, context):
-        # Connessione al database
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # Recupera i dati per calcolare la media ordinati per timestamp in ordine decrescente
-        cursor.execute("SELECT valore FROM azioni WHERE email = %s ORDER BY time_stamp DESC LIMIT %s", (request.email, request.count))
-        results = cursor.fetchall()
-
-        if results:
-            # Calcola la media dei valori
-            total_value = sum([row[0] for row in results])
-            average_value = total_value / len(results)
-            cursor.close()
-            conn.close()
-            return service_pb2.StockAverageResponse(average=average_value)
-        else:
-            cursor.close()
-            conn.close()
-            return service_pb2.StockAverageResponse(average=0.0)
+        # Crea una query per calcolare la media del valore delle azioni
+        query = GetAverageStockValueQuery(request.email, request.count)
+        stock_read_service = StockReadService()
+        
+        # Passa la query al servizio di lettura
+        average_value = stock_read_service.get_average_stock_value(query)
+        
+        return service_pb2.StockAverageResponse(average=average_value)
 
 # Funzione per avviare il server gRPC
 def serve():
@@ -177,3 +166,5 @@ def serve():
 
 if __name__ == '__main__':
     serve()
+
+

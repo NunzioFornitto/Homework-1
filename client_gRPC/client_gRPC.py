@@ -23,7 +23,7 @@ def run():
 
         scelta = input("Inserisci la tua scelta (1-6): ")
 
-        # Genera un request_id univoco per ogni richiesta
+        # Genera un request_id univoco per ogni richiesta (non gestito dal server)
         request_id = str(uuid.uuid4())
 
         if scelta == '1':
@@ -35,11 +35,48 @@ def run():
                 ticker = input("Inserisci il ticker dell'azione associata (o premi 'b' per tornare indietro): ")
                 if ticker.lower() == 'b':
                     break
-                user_request = service_pb2.UserRequest(email=email, ticker=ticker, request_id=request_id)
+
+                # Inserimento dei parametri high_value e low_value aggiuntivi
+                high_value, low_value = None, None
+                while True:
+                    print("Inserisci almeno uno dei seguenti valori (o premi 'b' per tornare indietro):")
+                    high_value_input = input("Valore massimo (high_value): ")
+                    low_value_input = input("Valore minimo (low_value): ")
+
+                    if high_value_input.lower() == 'b' or low_value_input.lower() == 'b':
+                        break
+
+                    # Convertire i valori in float se forniti (nel db sono in float)
+                    high_value = float(high_value_input) if high_value_input else None
+                    low_value = float(low_value_input) if low_value_input else None
+
+                    # Controllo di almeno uno dei due valori deve essere fornito
+                    if high_value is None and low_value is None:
+                        print("Errore: devi fornire almeno uno tra high_value e low_value.")
+                        continue
+
+                    # Controllo: high_value deve essere maggiore di low_value se entrambi sono forniti
+                    if high_value is not None and low_value is not None and high_value <= low_value:
+                        print("Errore: il valore massimo (high_value) deve essere maggiore del valore minimo (low_value).")
+                        continue
+
+                    break  # Uscita dal ciclo se i valori sono validi
+
+                # Se l'utente ha scelto di tornare indietro
+                if high_value_input.lower() == 'b' or low_value_input.lower() == 'b':
+                    break
+
+                user_request = service_pb2.UserRequest(
+                    email=email,
+                    ticker=ticker,
+                    high_value=high_value if high_value is not None else 0.0,
+                    low_value=low_value if low_value is not None else 0.0,
+                    request_id=request_id
+                )
                 response = user_stub.RegisterUser(user_request)
                 print(f"Registrazione Utente: Success: {response.success}, Message: {response.message}")
                 break  # Torna al menu principale dopo l'operazione
-
+        #Simile al caso 1, ma con la differenza che si aggiorna il ticker dell'utente
         elif scelta == '2':
             while True:
                 print("\n-- Aggiornamento Ticker Utente --")
@@ -49,10 +86,47 @@ def run():
                 ticker = input("Inserisci il nuovo ticker dell'azione (o premi 'b' per tornare indietro): ")
                 if ticker.lower() == 'b':
                     break
-                user_request = service_pb2.UserRequest(email=email, ticker=ticker, request_id=request_id)
+
+                # Inserimento dei parametri high_value e low_value
+                high_value, low_value = None, None
+                while True:
+                    print("Inserisci almeno uno dei seguenti valori (o premi 'b' per tornare indietro):")
+                    high_value_input = input("Valore massimo (high_value): ")
+                    low_value_input = input("Valore minimo (low_value): ")
+
+                    if high_value_input.lower() == 'b' or low_value_input.lower() == 'b':
+                        break
+
+                    # Convertire i valori in float se forniti
+                    high_value = float(high_value_input) if high_value_input else None
+                    low_value = float(low_value_input) if low_value_input else None
+
+                    # Controllo: almeno uno dei due valori deve essere fornito
+                    if high_value is None and low_value is None:
+                        print("Errore: devi fornire almeno uno tra high_value e low_value.")
+                        continue
+
+                    # Controllo: high_value deve essere maggiore di low_value se entrambi sono forniti
+                    if high_value is not None and low_value is not None and high_value <= low_value:
+                        print("Errore: il valore massimo (high_value) deve essere maggiore del valore minimo (low_value).")
+                        continue
+
+                    break  # Uscita dal ciclo se i valori sono validi
+
+                # Se l'utente ha scelto di tornare indietro
+                if high_value_input.lower() == 'b' or low_value_input.lower() == 'b':
+                    break
+                #creazione della richiesta per l'aggiornamento del ticker
+                user_request = service_pb2.UserRequest(
+                    email=email,
+                    ticker=ticker,
+                    high_value=high_value if high_value is not None else 0.0,
+                    low_value=low_value if low_value is not None else 0.0,
+                    request_id=request_id
+                )
                 response = user_stub.UpdateUser(user_request)
                 print(f"Aggiornamento Utente: Success: {response.success}, Message: {response.message}")
-                break  
+                break
 
         elif scelta == '3':
             while True:
@@ -103,3 +177,13 @@ def run():
 
 if __name__ == "__main__":
     run()
+
+
+
+
+
+
+
+
+
+

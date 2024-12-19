@@ -7,11 +7,14 @@ USE sistema_finanza;
 -- Creazione della tabella degli utenti (solo se non esiste già)
 CREATE TABLE IF NOT EXISTS utenti (
     id_utente INT AUTO_INCREMENT PRIMARY KEY,         -- ID univoco per ogni utente
-    email VARCHAR(255) UNIQUE NOT NULL,                -- Email dell'utente, unica
-    ticker VARCHAR(20) NOT NULL,                       -- Codice dell'azione associato all'utente
+    email VARCHAR(255) UNIQUE NOT NULL,               -- Email dell'utente, unica
+    ticker VARCHAR(20) NOT NULL,                      -- Codice dell'azione associato all'utente
+    high_value FLOAT,                                  -- Valore massimo associato
+    low_value FLOAT,                                   -- Valore minimo associato
     creato_il DATETIME DEFAULT CURRENT_TIMESTAMP,      -- Data e ora di creazione
     aggiornato_il DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP  -- Data e ora di aggiornamento
 );
+
 
 -- Creazione della tabella dei valori azionari (solo se non esiste già)
 CREATE TABLE IF NOT EXISTS azioni (
@@ -37,6 +40,7 @@ END$$
 
 DELIMITER ;
 
+
 -- Creazione dell'utente Admin (solo se non esiste già)
 CREATE USER IF NOT EXISTS 'Admin'@'%' IDENTIFIED BY '1234';
 
@@ -46,14 +50,6 @@ GRANT ALL PRIVILEGES ON sistema_finanza.* TO 'Admin'@'%';
 -- Applicare i privilegi
 FLUSH PRIVILEGES;
 
--- Inserimento di dati nella tabella utenti esempio in modo che il data collector trovi già dei dati
-INSERT INTO utenti (email, ticker)
-VALUES
-    ('utente1@example.com', 'AAPL'),
-    ('utente2@example.com', 'GOOG');
-
--- Inserimento di dati nella tabella azioni esempio in modo da debuggare la media degli ultimi n valori
-INSERT INTO azioni (email, ticker, valore)
-VALUES
-    ('utente1@example.com', 'AAPL', 150.25),
-    ('utente2@example.com', 'GOOG', 2800.50);
+INSERT INTO utenti (email, ticker, high_value, low_value)
+VALUES 
+    ('nfornitto@gmail.com', 'AAPL', 150.50, 120.30);

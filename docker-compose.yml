@@ -9,7 +9,7 @@ services:
       MYSQL_ROOT_PASSWORD: 1234          
       MYSQL_DATABASE: sistema_finanza     
       MYSQL_USER: Admin                   
-      MYSQL_PASSWORD: 1234             
+      MYSQL_PASSWORD: 1234              
       # Serve per avere mysql con l'orario UTC+1 per i timestamp nella tabella azioni, altrimenti sarebbero in UTC
       TZ: Europe/Rome 
     volumes:
@@ -42,6 +42,62 @@ services:
     networks:
       - sistema_network
     restart: always #prova sta cosa per fixare, il fatto che il data collector va in exit se il db non è pronto
+  
+  # Servizio usato da kafka
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.2
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data  
+    networks:
+      - sistema_network
+
+  # Servizio Kafka, plaintext perchè chi pubblica e chi consuma non deve loggarsi
+  kafka:
+    image: confluentinc/cp-kafka:7.3.2
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true" # Serve per creare automaticamente i topic
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - sistema_network
+  # Servizio alert_system    
+  alert_system:
+      build:
+        context: ./alert_system  
+        dockerfile: Dockerfile.alertsystem 
+      container_name: alert_system
+      depends_on:
+        - kafka
+        - mysql
+      networks:
+        - sistema_network
+      restart: always
+  #Servizio alert_notifier
+  alert_notifier_system:
+      build:
+        context: ./alert_notifier_system  
+        dockerfile: Dockerfile.alert_notifier_system 
+      container_name: alert_notifier_system
+      depends_on:
+        - kafka
+        - mysql
+      networks:
+        - sistema_network
+      restart: always  
 
 networks:
   sistema_network:
@@ -49,3 +105,5 @@ networks:
 
 volumes:
   mysql_data: {}
+  kafka_data: {}
+  zookeeper_data: {}

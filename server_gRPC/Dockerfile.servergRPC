@@ -14,6 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY server_gRPC.py .
 COPY service_pb2.py .
 COPY service_pb2_grpc.py .
+#Aggiunto cqrs.py perchè il server usa il pattern CQRS
+COPY cqrs.py /app/
 
 # Imposta il comando di esecuzione del server gRPC
 CMD ["python", "server_gRPC.py"]

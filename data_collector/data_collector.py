@@ -1,8 +1,11 @@
 import time
 import yfinance as yf
-import mysql.connector
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from circuit_breaker import CircuitBreaker, CircuitBreakerOpenException
+from cqrs import UserReadService, SaveStockDataCommand, StockWriteService
+
+from confluent_kafka import Producer
+import json
 
 # Configura il Circuit Breaker
 circuit_breaker = CircuitBreaker(failure_threshold=5, recovery_timeout=30)
@@ -12,31 +15,22 @@ def get_stock_data(ticker):
     """
     Recupera i dati dell'azione da yfinance per un determinato ticker.
     """
-    #Recupero i dati dell'azione da yfinance per un giorno e restituisco il valore di chiusura e il timestamp
     stock = yf.Ticker(ticker)
     data = stock.history(period="1d")  # Recuperiamo i dati per 1 giorno
     if data.empty:
         raise Exception(f"Nessun dato disponibile per {ticker}")
     latest_value = data['Close'].iloc[-1]  # Ultimo valore di chiusura
     timestamp = data.index[-1]  # Timestamp dell'ultimo valore
-    return latest_value, timestamp
+    timestamp_str = timestamp.isoformat()
+    return latest_value, timestamp_str
 
 # Funzione per recuperare gli utenti dal database
 def get_users_from_db():
     """
     Recupera gli utenti registrati dal database.
     """
-    connection = mysql.connector.connect(
-        host='mysql', 
-        user='Admin', 
-        password='1234', 
-        database='sistema_finanza'
-    )
-    cursor = connection.cursor(dictionary=True)
-    cursor.execute("SELECT email, ticker FROM utenti")
-    users = cursor.fetchall()
-    cursor.close()
-    connection.close()
+    read_service = UserReadService()
+    users = read_service.get_all_users()
     return users
 
 # Funzione per memorizzare i dati nel database
@@ -44,50 +38,80 @@ def save_stock_data(email, ticker, value):
     """
     Memorizza i dati relativi al valore azionario nel database.
     """
-    connection = mysql.connector.connect(
-        host='mysql', 
-        user='Admin', 
-        password='1234', 
-        database='sistema_finanza'
-    )
-    cursor = connection.cursor()
-    cursor.execute("""
-        INSERT INTO azioni (email, ticker, valore)
-        VALUES (%s, %s, %s)
-    """, (email, ticker, value))  # Non passo il timestamp perche' se lo calcola nel database, quando faccio diretto la insert
-    connection.commit()
-    cursor.close()
-    connection.close()
+    write_service = StockWriteService()
+    command = SaveStockDataCommand(email, ticker, value)
+    write_service.save_stock_data(command)
+
+# Funzione per inviare un messaggio a Kafka
+def send_alert_to_kafka():
+    """
+    Invia un messaggio di notifica generico al topic Kafka `to-alert-system`.
+    """
+    message = {
+        'status': 'update_complete',
+        'message': 'Aggiornamento dei dati completato.',
+        'timestamp': datetime.now(timezone(timedelta(0))).isoformat()
+    }
+    producer.produce(topic, json.dumps(message), callback=delivery_report)
+    producer.flush()  # Assicurati che il messaggio venga inviato
+
+def delivery_report(err, msg):
+    """Callback per riportare il risultato della consegna del messaggio."""
+    if err:
+        print(f"Delivery failed: {err}")
+    else:
+        print(f"Message delivered to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}")
 
 # Funzione principale del Data Collector
 def run_data_collector():
     """
-    Esegue il Data Collector che recupera i dati e li salva nel database.
+    Esegue il Data Collector che recupera i dati e li salva nel database,
+    quindi invia una notifica generica a Kafka.
     """
     while True:
-        # Recupera gli utenti dal database dalla tabella utenti e mi metto in email e ticker l'utente e il ticker azione
+        # Recupera gli utenti dal database
         users = get_users_from_db()
-        
+        success_count = 0
+
+        while users is None:
+            print("Ancora nessun utente nel DB, ritento il recupero degli utenti")
+            users = get_users_from_db() 
+
         for user in users:
             email = user['email']
             ticker = user['ticker']
             
             # Usa il Circuit Breaker per gestire il recupero dei dati da yfinance
             try:
-                # Usa il circuito per chiamare get_stock_data in modo protetto
-                #Qui non si passano gli argomenti in get_stock_data perche' vengono passati in call
-                #la funzione call fatta nel circuit breaker permette di chiamare
-                #qualsiasi funzione e passare gli argomenti "esternamente".
                 value, timestamp = circuit_breaker.call(get_stock_data, ticker)
                 save_stock_data(email, ticker, value)  
+                success_count += 1
                 print(f"Valore salvato per {email}: {ticker} - {value} - {timestamp}")
             except CircuitBreakerOpenException:
                 print(f"Impossibile recuperare i dati per {ticker} - Circuit Breaker attivato.")
             except Exception as e:
                 print(f"Errore durante il processo per {email}: {e}")
         
-        # Aspetta 1 minuto prima di ripetere il processo
+        # Invia una notifica a Kafka se almeno un dato è stato aggiornato
+        if success_count > 0:
+            send_alert_to_kafka()
+        
+        # Aspetta 60 secondi prima di ripetere il processo
         time.sleep(60)
 
 if __name__ == "__main__":
+    time.sleep(30)  # Aspetta 30 secondi prima di iniziare
+    # Kafka configuration with custom settings
+    producer_config = {
+        'bootstrap.servers': 'kafka:9092',  # Kafka broker address
+        'acks': 'all',  # Ensure all in-sync replicas acknowledge the message
+        'batch.size': 500,  # Maximum number of bytes to batch in a single request
+        'max.in.flight.requests.per.connection': 1,  # Only one in-flight request per connection
+        'retries': 3  # Retry up to 3 times on failure
+    }
+
+    # Crea il produttore Kafka
+    producer = Producer(producer_config)
+    topic = 'to-alert-system'  # Topic per notificare il completamento
     run_data_collector()
+

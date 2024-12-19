@@ -1,0 +1,32 @@
+# Usa un'immagine base di Python
+FROM python:3.10-slim
+
+# Aggiorna il gestore di pacchetti e installa le librerie necessarie per confluent-kafka
+RUN apt-get update && apt-get install -y \
+    gcc \
+    python3-dev \
+    musl-dev \
+    libssl-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Aggiorna pip all'ultima versione
+RUN pip install --upgrade pip
+
+# Imposta il working directory
+WORKDIR /app
+
+# Copia il file requirements.txt nel container
+COPY requirements.txt . 
+
+# Installa le dipendenze da requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copia il codice del progetto nel container
+COPY alert_notifier_system.py . 
+
+# Espone la porta su cui il servizio Kafka ascolta
+EXPOSE 29092
+
+# Imposta il comando di avvio del container
+CMD ["python", "alert_notifier_system.py"]

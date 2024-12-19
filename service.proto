@@ -6,6 +6,8 @@ package sistema_finanza;
 message UserRequest {
     string email = 1;        // Email dell'utente
     string ticker = 2;       // Ticker associato all'utente
+    float high_value = 4;    // Valore massimo associato (opzionale)
+    float low_value = 5;     // Valore minimo associato (opzionale)
     string request_id = 3;   // ID unico per la richiesta
 }
 
