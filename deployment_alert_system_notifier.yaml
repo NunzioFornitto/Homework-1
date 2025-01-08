@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alert-system-notifier
+  labels:
+    app: alert-system-notifier
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alert-system-notifier
+  template:
+    metadata:
+      labels:
+        app: alert-system-notifier
+    spec:
+      containers:
+        - name: alert-system-notifier
+          image: nunziofornitto/alert-notifier-system
+          ports:
+            - containerPort: 7000
+

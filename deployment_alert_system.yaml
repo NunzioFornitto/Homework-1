@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alert-system
+  labels:
+    app: alert-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alert-system
+  template:
+    metadata:
+      labels:
+        app: alert-system
+    spec:
+      containers:
+        - name: alert-system
+          image: nunziofornitto/alert-system
+          ports:
+            - containerPort: 4000
+          env:
+            - name: MYSQL_HOST
+              value: "mysql"  # Nome del servizio MySQL
+            - name: MYSQL_USER
+              value: "Admin"
+            - name: MYSQL_PASSWORD
+              value: "1234"
+            - name: MYSQL_DATABASE
+              value: "sistema_finanza"
+

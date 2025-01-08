@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-collector
+  labels:
+    app: data-collector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: data-collector
+  template:
+    metadata:
+      labels:
+        app: data-collector
+    spec:
+      containers:
+        - name: data-collector
+          image: nunziofornitto/data-collector
+          ports:
+            - containerPort: 8002  #serviva dopo per prometheus
+          env:
+            - name: MYSQL_HOST
+              value: "mysql" 
+            - name: MYSQL_USER
+              value: "Admin"
+            - name: MYSQL_PASSWORD
+              value: "1234"
+            - name: MYSQL_DATABASE
+              value: "sistema_finanza"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: datacollector #importante
+spec:
+  selector:
+    app: data-collector
+  ports:
+    - protocol: TCP
+      port: 8002         # Porta esposta dal servizio
+      targetPort: 8002   # Porta del container gRPC
+  type: ClusterIP
+

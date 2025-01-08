@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grpc-server
+  labels:
+    app: grpc-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grpc-server
+  template:
+    metadata:
+      labels:
+        app: grpc-server
+    spec:
+      containers:
+        - name: grpc-server
+          image: nunziofornitto/server-grpc 
+          ports:
+            - containerPort: 50051
+            - containerPort: 8000
+          env:
+            - name: MYSQL_HOST
+              value: "mysql"  # Nome del servizio MySQL
+            - name: MYSQL_USER
+              value: "Admin"
+            - name: MYSQL_PASSWORD
+              value: "1234"
+            - name: MYSQL_DATABASE
+              value: "sistema_finanza"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: servergrpc
+spec:
+  selector:
+    app: grpc-server
+  ports:
+    - name: grpc-server-flask        
+      protocol: TCP
+      port: 50051            # Porta esposta per flask-app
+      targetPort: 50051      
+    - name: grpc-server-prom         
+      protocol: TCP
+      port: 8000             # Porta esposta per prometheus
+      targetPort: 8000    
+  type: ClusterIP
+---
+

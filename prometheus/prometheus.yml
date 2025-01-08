@@ -1,0 +1,31 @@
+# my global config
+global:
+  scrape_interval: 30s  # Intervallo di raccolta predefinito (30 secondi)
+  evaluation_interval: 30s  # Intervallo di valutazione predefinito (30 secondi)
+  external_labels:
+    monitor: 'DSBD'
+
+# A scrape configuration containing exactly one endpoint to scrape:
+scrape_configs:
+  # Job per raccogliere le metriche da Prometheus stesso
+  - job_name: 'prometheus'
+    scrape_interval: 25s  # Intervallo di raccolta specifico per Prometheus
+    static_configs:
+      - targets:
+          - localhost:9090  # Indirizzo del server Prometheus
+          #- 172.17.0.1:9999
+          - cadvisor:8080  # Indirizzo di cadvisor
+          - 172.17.0.1:53122
+
+  # Job per raccogliere le metriche dal server gRPC
+  - job_name: 'server_grpc_exporter'  # Nome del job per l'exporter gRPC
+    scrape_interval: 30s  # Intervallo di raccolta per il server gRPC
+    static_configs:
+      - targets:
+          - 'servergrpc:8000'  # Aggiungi il target del server gRPC sulla porta 8000
+  #job per raccogliere le metriche dal data collector
+  - job_name: 'data_collector_exporter'  # Nome del job per il data collector
+    scrape_interval: 30s  # Intervallo di raccolta per il data collector
+    static_configs:
+      - targets:
+          - 'datacollector:8002'  # Aggiungi il target del datacollectpr sulla porta 5000
