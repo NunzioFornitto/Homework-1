@@ -1,0 +1,46 @@
+services:
+  mysql:
+    image: mysql:8.0
+
+  flask-app:
+    build:
+      context: ./client_gRPC
+      dockerfile: Dockerfile.client
+    image: nunziofornitto/flask-app:latest
+
+  server_grpc:
+    build:
+      context: ./server_grpc
+      dockerfile: Dockerfile.servergRPC
+    image: nunziofornitto/server-grpc:latest
+
+  data_collector:
+    build:
+      context: ./data_collector
+      dockerfile: Dockerfile.datacollector
+    image: nunziofornitto/data-collector:latest
+
+  zookeeper:
+    image: nunziofornitto/zookeeper:7.3.2
+
+  kafka:
+    image: nunziofornitto/kafka:7.3.2
+
+  alert_system:
+    build:
+      context: ./alert_system
+      dockerfile: Dockerfile.alertsystem
+    image: nunziofornitto/alert-system:latest
+
+  alert_notifier_system:
+    build:
+      context: ./alert_notifier_system
+      dockerfile: Dockerfile.alert_notifier_system
+    image: nunziofornitto/alert-notifier-system:latest
+
+  prometheus:
+    image: nunziofornitto/prometheus:v2.46.0
+
+  cadvisor:
+    image: nunziofornitto/cadvisor:latest
+

@@ -6,6 +6,25 @@ import service_pb2
 import service_pb2_grpc
 import threading
 from cqrs import UserWriteService, AddUserCommand, UserReadService, UpdateUserCommand, GetLatestStockValueQuery, StockReadService, GetAverageStockValueQuery,DeleteUserCommand
+import prometheus_client
+from prometheus_client import Gauge, Counter
+import socket
+
+HOSTNAME = socket.gethostname()
+
+APP_NAME = "manage_users"
+
+# Prometheus metrics
+REQUEST_COUNTER_REGISTRATION = Counter(
+    'grpc_request_count',
+    'Total number of gRPC requests',
+    ['service', 'node']
+)
+RESPONSE_TIME_GAUGE_REGISTRATION = Gauge(
+    'grpc_response_time',
+    'Response time of gRPC requests in seconds',
+    ['service', 'node']
+)
 
 # Cache sia per aggiornamento che per cancellazione
 register_update_cache = {}
@@ -24,6 +43,10 @@ def get_db_connection():
 class UserService(service_pb2_grpc.UserServiceServicer):
 
     def RegisterUser(self, request, context):
+        #prendo l'istante in cui inizia la richiesta
+        start_time = time.time()
+        REQUEST_COUNTER_REGISTRATION.labels(service=APP_NAME, node=HOSTNAME).inc()
+        
         with cache_lock:  # Blocca l'accesso alla cache
             if request.email in register_update_cache:
                 cached_user = register_update_cache[request.email]
@@ -49,6 +72,9 @@ class UserService(service_pb2_grpc.UserServiceServicer):
 
         try:
             write_service.handle_register_user(command)
+            # Calcolo il tempo di risposta della richiesta
+            response_time = time.time() - start_time
+            RESPONSE_TIME_GAUGE_REGISTRATION.labels(service=APP_NAME,node=HOSTNAME).set(response_time)
 
             # Aggiungo l'utente nella cache dopo averlo registrato
             with cache_lock:
@@ -144,9 +170,23 @@ class StockService(service_pb2_grpc.StockServiceServicer):
         average_value = stock_read_service.get_average_stock_value(query)
         
         return service_pb2.StockAverageResponse(average=average_value)
+    
+    
+ # Thread per l'exporter Prometheus
+def start_exporter():
+    prometheus_client.start_http_server(8000)  # Porta su cui esporre le metriche
+    print(f"Prometheus exporter running at http://{HOSTNAME}:8000/metrics")
+    while True:
+        time.sleep(1)  # Mantieni il thread vivo
+           
 
 # Funzione per avviare il server gRPC
 def serve():
+    
+    exporter_thread = threading.Thread(target=start_exporter)
+    exporter_thread.daemon = True  # Termina quando il processo principale si chiude
+    exporter_thread.start()
+    
     # Creo il server con un pool di thread per gestire le richieste
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     # Registro i servizi al server precedentemente creato

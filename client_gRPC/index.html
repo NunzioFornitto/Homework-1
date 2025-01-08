@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestione Utenti e Azioni</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        h1 { color: #333; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; }
+        .form-group input, .form-group button { width: 100%; padding: 10px; }
+        button { cursor: pointer; background-color: #4CAF50; color: white; border: none; }
+        button:hover { background-color: #45a049; }
+        .result { margin-top: 20px; padding: 10px; background-color: #f9f9f9; border: 1px solid #ddd; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Gestione Utenti e Azioni</h1>
+
+        <!-- Form per Registrare un Utente -->
+        <div class="form-group">
+            <h3>Registrazione Utente</h3>
+            <label for="email">Email</label>
+            <input type="email" id="email" placeholder="Inserisci email">
+            
+            <label for="ticker">Ticker</label>
+            <input type="text" id="ticker" placeholder="Inserisci ticker">
+            
+            <label for="high_value">Valore massimo (high_value)</label>
+            <input type="number" id="high_value" placeholder="Valore massimo">
+            
+            <label for="low_value">Valore minimo (low_value)</label>
+            <input type="number" id="low_value" placeholder="Valore minimo">
+            
+            <button onclick="registerUser()">Registra Utente</button>
+        </div>
+
+        <!-- Form per Aggiornare un Utente -->
+        <div class="form-group">
+            <h3>Aggiorna Utente</h3>
+            <label for="email_update">Email</label>
+            <input type="email" id="email_update" placeholder="Inserisci email">
+            
+            <label for="ticker_update">Ticker</label>
+            <input type="text" id="ticker_update" placeholder="Inserisci ticker">
+            
+            <label for="high_value_update">Valore massimo (high_value)</label>
+            <input type="number" id="high_value_update" placeholder="Valore massimo">
+            
+            <label for="low_value_update">Valore minimo (low_value)</label>
+            <input type="number" id="low_value_update" placeholder="Valore minimo">
+            
+            <button onclick="updateUser()">Aggiorna Utente</button>
+        </div>
+
+        <!-- Form per Ottenere il Valore Azionario Più Recente -->
+        <div class="form-group">
+            <h3>Valore Azionario Più Recente</h3>
+            <label for="email_stock">Email</label>
+            <input type="email" id="email_stock" placeholder="Inserisci email">
+            <button onclick="getLatestStockValue()">Ottenere Valore</button>
+        </div>
+
+        <!-- Form per Ottenere la Media del Valore Azionario -->
+        <div class="form-group">
+            <h3>Media del Valore Azionario</h3>
+            <label for="email_average">Email</label>
+            <input type="email" id="email_average" placeholder="Inserisci email">
+            
+            <label for="count">Numero di Valori</label>
+            <input type="number" id="count" placeholder="Inserisci numero di valori">
+            
+            <button onclick="getAverageStockValue()">Calcolare Media</button>
+        </div>
+
+        <!-- Form per Eliminare un Utente -->
+        <div class="form-group">
+            <h3>Elimina Utente</h3>
+            <label for="email_delete">Email</label>
+            <input type="email" id="email_delete" placeholder="Inserisci email">
+            <button onclick="deleteUser()">Elimina Utente</button>
+        </div>
+
+        <div id="result" class="result"></div>
+    </div>
+
+    <script>
+        // Funzione per registrare un utente
+        async function registerUser() {
+            const email = document.getElementById("email").value;
+            const ticker = document.getElementById("ticker").value;
+            const high_value = parseFloat(document.getElementById("high_value").value);
+            const low_value = parseFloat(document.getElementById("low_value").value);
+
+            const response = await fetch('/register_user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: email,
+                    ticker: ticker,
+                    high_value: isNaN(high_value) ? null : high_value,
+                    low_value: isNaN(low_value) ? null : low_value
+                })
+            });
+
+            const data = await response.json();
+            document.getElementById("result").innerHTML = `<strong>${data.message}</strong>`;
+
+            // Pulisci i campi del modulo
+            document.getElementById("email").value = '';
+            document.getElementById("ticker").value = '';
+            document.getElementById("high_value").value = '';
+            document.getElementById("low_value").value = '';
+        }
+
+        // Funzione per aggiornare un utente
+        async function updateUser() {
+            const email = document.getElementById("email_update").value;
+            const ticker = document.getElementById("ticker_update").value;
+            const high_value = parseFloat(document.getElementById("high_value_update").value);
+            const low_value = parseFloat(document.getElementById("low_value_update").value);
+
+            const response = await fetch('/update_user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: email,
+                    ticker: ticker,
+                    high_value: isNaN(high_value) ? null : high_value,
+                    low_value: isNaN(low_value) ? null : low_value
+                })
+            });
+
+            const data = await response.json();
+            document.getElementById("result").innerHTML = `<strong>${data.message}</strong>`;
+
+            // Pulisci i campi del modulo
+            document.getElementById("email_update").value = '';
+            document.getElementById("ticker_update").value = '';
+            document.getElementById("high_value_update").value = '';
+            document.getElementById("low_value_update").value = '';
+        }
+
+        // Funzione per ottenere il valore azionario più recente
+        async function getLatestStockValue() {
+            const email = document.getElementById("email_stock").value;
+
+            const response = await fetch('/get_latest_stock_value', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email })
+            });
+
+            const data = await response.json();
+            document.getElementById("result").innerHTML = `<strong>Valore azionario per ${data.ticker}: ${data.value} (Data: ${data.timestamp})</strong>`;
+
+            // Pulisci il campo email
+            document.getElementById("email_stock").value = '';
+        }
+
+        // Funzione per ottenere la media del valore azionario
+        async function getAverageStockValue() {
+            const email = document.getElementById("email_average").value;
+            const count = parseInt(document.getElementById("count").value);
+
+            const response = await fetch('/get_average_stock_value', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email, count: count })
+            });
+
+            const data = await response.json();
+            document.getElementById("result").innerHTML = `<strong>Media del valore azionario: ${data.average}</strong>`;
+
+            // Pulisci i campi
+            document.getElementById("email_average").value = '';
+            document.getElementById("count").value = '';
+        }
+
+        // Funzione per eliminare un utente
+        async function deleteUser() {
+            const email = document.getElementById("email_delete").value;
+
+            const response = await fetch('/delete_user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email })
+            });
+
+            const data = await response.json();
+            document.getElementById("result").innerHTML = `<strong>${data.message}</strong>`;
+
+            // Pulisci il campo email
+            document.getElementById("email_delete").value = '';
+        }
+    </script>
+
+</body>
+</html>

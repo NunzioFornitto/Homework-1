@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Servizio MySQL
   mysql:
@@ -10,41 +8,53 @@ services:
       MYSQL_DATABASE: sistema_finanza     
       MYSQL_USER: Admin                   
       MYSQL_PASSWORD: 1234              
-      # Serve per avere mysql con l'orario UTC+1 per i timestamp nella tabella azioni, altrimenti sarebbero in UTC
       TZ: Europe/Rome 
     volumes:
-      - mysql_data:/var/lib/mysql         # Volume per i dati del DB
-      - ./db.sql:/docker-entrypoint-initdb.d/db.sql # Script di inizializzazione per le tabelle
+      - mysql_data:/var/lib/mysql
+      - ./db.sql:/docker-entrypoint-initdb.d/db.sql
     networks:
       - sistema_network
-
+    restart: always
+  #Flask app
+  flask-app:
+    build:
+      context: ./client_gRPC
+      dockerfile: Dockerfile.client  # Assicurati che il tuo Dockerfile si chiami "Dockerfile"
+    container_name: flaskapp
+    ports:
+      - "5000:5000"  # Porta di Flask
+    networks:
+      - sistema_network
   # Servizio server gRPC
-  server_grpc:
+  servergrpc:
     build:
       context: ./server_grpc
       dockerfile: Dockerfile.servergRPC
-    container_name: server_grpc
+    container_name: servergrpc
     depends_on:
       - mysql
     ports:
-      - "50051:50051"  # Mappiamo solo la porta del server gRPC
+      - "50051:50051"
+      - "8000:8000" 
     networks:
       - sistema_network
+    restart: always
 
   # Servizio DataCollector
-  data_collector:
+  datacollector:
     build:
       context: ./data_collector
       dockerfile: Dockerfile.datacollector
-    container_name: data_collector
+    container_name: datacollector
     depends_on:
       - mysql
+    ports:
+      - "8002:8002"
     networks:
       - sistema_network
-    restart: always #prova sta cosa per fixare, il fatto che il data collector va in exit se il db non è pronto
+    restart: always
   
-  # Servizio usato da kafka
-
+  # Servizio Zookeeper
   zookeeper:
     image: confluentinc/cp-zookeeper:7.3.2
     container_name: zookeeper
@@ -52,11 +62,12 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
     volumes:
-      - zookeeper_data:/var/lib/zookeeper/data  
+      - zookeeper_data:/var/lib/zookeeper/data
     networks:
       - sistema_network
+    restart: always
 
-  # Servizio Kafka, plaintext perchè chi pubblica e chi consuma non deve loggarsi
+  # Servizio Kafka
   kafka:
     image: confluentinc/cp-kafka:7.3.2
     container_name: kafka
@@ -69,35 +80,75 @@ services:
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
       KAFKA_LOG_RETENTION_HOURS: 168
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true" # Serve per creare automaticamente i topic
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     volumes:
       - kafka_data:/var/lib/kafka/data
     networks:
       - sistema_network
+    restart: always
+
   # Servizio alert_system    
-  alert_system:
-      build:
-        context: ./alert_system  
-        dockerfile: Dockerfile.alertsystem 
-      container_name: alert_system
-      depends_on:
-        - kafka
-        - mysql
-      networks:
-        - sistema_network
-      restart: always
-  #Servizio alert_notifier
-  alert_notifier_system:
-      build:
-        context: ./alert_notifier_system  
-        dockerfile: Dockerfile.alert_notifier_system 
-      container_name: alert_notifier_system
-      depends_on:
-        - kafka
-        - mysql
-      networks:
-        - sistema_network
-      restart: always  
+  alertsystem:
+    build:
+      context: ./alert_system
+      dockerfile: Dockerfile.alertsystem
+    container_name: alertsystem
+    depends_on:
+      - kafka
+      - mysql
+    networks:
+      - sistema_network
+    restart: always
+
+  # Servizio alert_notifier
+  alertnotifier_system:
+    build:
+      context: ./alert_notifier_system
+      dockerfile: Dockerfile.alert_notifier_system
+    container_name: alertnotifiersystem
+    depends_on:
+      - kafka
+      - mysql
+    networks:
+      - sistema_network
+    restart: always
+
+  # Servizio Prometheus
+  prometheus:
+    image: prom/prometheus:v2.46.0  # Versione aggiornata di Prometheus
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - 53122:9090
+    links:
+      - cadvisor:cadvisor
+    depends_on:
+      - cadvisor
+      - servergrpc
+    networks:
+      - sistema_network
+    restart: always
+
+  # Servizio cadvisor
+  cadvisor:
+    image: google/cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - 8080:8080
+    networks:
+      - sistema_network
+    restart: always
 
 networks:
   sistema_network:
@@ -107,3 +158,4 @@ volumes:
   mysql_data: {}
   kafka_data: {}
   zookeeper_data: {}
+  prometheus_data: {}

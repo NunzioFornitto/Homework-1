@@ -53,12 +53,12 @@ def listen_for_alerts():
         print(f"Messaggio ricevuto: {data}")
         
         consumer.commit(asynchronous=False)  # Commit dell'offset per il messaggio
-        # Estrai i parametri dal messaggio
+        # Estraggo i parametri dal messaggio
         email = data.get('email')
         ticker = data.get('ticker')
         condition = data.get('condition')
 
-        # Crea il corpo dell'email
+        # Creo il corpo dell'email
         subject = f'Alert: {ticker}'
         body = f'La condizione per il ticker {ticker} è stata soddisfatta.\n\nCondizione: {condition}'
         

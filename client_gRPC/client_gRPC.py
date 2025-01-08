@@ -1,188 +1,134 @@
+from flask import Flask, request, jsonify, render_template
+
 import grpc
 import service_pb2
 import service_pb2_grpc
-import sys
-import uuid  
+import uuid
 
-def run():
-    # Connessione al server gRPC in ascolto sulla porta 50051
-    channel = grpc.insecure_channel('localhost:50051')
+app = Flask(__name__)
+
+# Connessione al server gRPC in ascolto sulla porta 50051
+channel = grpc.insecure_channel('servergrpc:50051')
+user_stub = service_pb2_grpc.UserServiceStub(channel)
+stock_stub = service_pb2_grpc.StockServiceStub(channel)
+
+def validate_values(high_value, low_value):
+    # Controllo che almeno uno tra high_value e low_value sia stato fornito
+    if high_value is None and low_value is None:
+        return False, "Errore: devi fornire almeno uno tra high_value e low_value."
     
-    # Stub per i servizi UserService e StockService
-    user_stub = service_pb2_grpc.UserServiceStub(channel)
-    stock_stub = service_pb2_grpc.StockServiceStub(channel)
+    # Se entrambi sono forniti, controllo che high_value sia maggiore di low_value
+    if high_value is not None and low_value is not None and high_value <= low_value:
+        return False, "Errore: il valore massimo (high_value) deve essere maggiore del valore minimo (low_value)."
+    
+    return True, ""
 
-    while True:
-        print("\nScegli una delle seguenti opzioni:")
-        print("1. Registrazione Utente")
-        print("2. Aggiornamento Ticker Utente")
-        print("3. Recupero Ultimo Valore Azione")
-        print("4. Calcolo della Media degli Ultimi Valori Azionari")
-        print("5. Cancellazione Utente")
-        print("6. Esci")
+@app.route('/')
+def home():
+    return render_template('index.html')
 
-        scelta = input("Inserisci la tua scelta (1-6): ")
+@app.route('/register_user', methods=['POST'])
+def register_user():
+    data = request.json
+    email = data.get('email')
+    ticker = data.get('ticker')
+    high_value = data.get('high_value', None)
+    low_value = data.get('low_value', None)
 
-        # Genero un request_id univoco per ogni richiesta (non gestito dal server)
-        request_id = str(uuid.uuid4())
+    # Validazione dei valori
+    valid, message = validate_values(high_value, low_value)
+    if not valid:
+        return jsonify({'success': False, 'message': message}), 200  # Success con messaggio di errore
 
-        if scelta == '1':
-            while True:
-                print("\n-- Registrazione Utente --")
-                email = input("Inserisci l'email dell'utente (o premi 'b' per tornare indietro): ")
-                if email.lower() == 'b':
-                    break
-                ticker = input("Inserisci il ticker dell'azione associata (o premi 'b' per tornare indietro): ")
-                if ticker.lower() == 'b':
-                    break
+    request_id = str(uuid.uuid4())
 
-                # Inserimento dei parametri high_value e low_value aggiuntivi
-                high_value, low_value = None, None
-                while True:
-                    print("Inserisci almeno uno dei seguenti valori (o premi 'b' per tornare indietro):")
-                    high_value_input = input("Valore massimo (high_value): ")
-                    low_value_input = input("Valore minimo (low_value): ")
+    user_request = service_pb2.UserRequest(
+        email=email,
+        ticker=ticker,
+        high_value=high_value if high_value is not None else 0.0,
+        low_value=low_value if low_value is not None else 0.0,
+        request_id=request_id
+    )
+    response = user_stub.RegisterUser(user_request)
+    return jsonify({
+        'success': response.success,
+        'message': response.message
+    })
 
-                    if high_value_input.lower() == 'b' or low_value_input.lower() == 'b':
-                        break
+@app.route('/update_user', methods=['POST'])
+def update_user():
+    data = request.json
+    email = data.get('email')
+    ticker = data.get('ticker')
+    high_value = data.get('high_value', None)
+    low_value = data.get('low_value', None)
 
-                    # Convertire i valori in float se forniti (nel db sono in float)
-                    high_value = float(high_value_input) if high_value_input else None
-                    low_value = float(low_value_input) if low_value_input else None
+    # Validazione dei valori
+    valid, message = validate_values(high_value, low_value)
+    if not valid:
+        return jsonify({'success': False, 'message': message}), 200  # Success con messaggio di errore
 
-                    # Controllo di almeno uno dei due valori deve essere fornito
-                    if high_value is None and low_value is None:
-                        print("Errore: devi fornire almeno uno tra high_value e low_value.")
-                        continue
+    request_id = str(uuid.uuid4())
 
-                    # Controllo: high_value deve essere maggiore di low_value se entrambi sono forniti
-                    if high_value is not None and low_value is not None and high_value <= low_value:
-                        print("Errore: il valore massimo (high_value) deve essere maggiore del valore minimo (low_value).")
-                        continue
+    user_request = service_pb2.UserRequest(
+        email=email,
+        ticker=ticker,
+        high_value=high_value if high_value is not None else 0.0,
+        low_value=low_value if low_value is not None else 0.0,
+        request_id=request_id
+    )
+    response = user_stub.UpdateUser(user_request)
+    return jsonify({
+        'success': response.success,
+        'message': response.message
+    })
 
-                    break  # Uscita dal ciclo se i valori sono validi
+@app.route('/get_latest_stock_value', methods=['POST'])
+def get_latest_stock_value():
+    data = request.json
+    email = data.get('email')
 
-                # Se l'utente ha scelto di tornare indietro
-                if high_value_input.lower() == 'b' or low_value_input.lower() == 'b':
-                    break
+    stock_request = service_pb2.StockRequest(email=email)
+    stock_response = stock_stub.GetLatestStockValue(stock_request)
 
-                user_request = service_pb2.UserRequest(
-                    email=email,
-                    ticker=ticker,
-                    high_value=high_value if high_value is not None else 0.0,
-                    low_value=low_value if low_value is not None else 0.0,
-                    request_id=request_id
-                )
-                response = user_stub.RegisterUser(user_request)
-                print(f"Registrazione Utente: Success: {response.success}, Message: {response.message}")
-                break  # Torna al menu principale dopo l'operazione
-        #Simile al caso 1, ma con la differenza che si aggiorna il ticker dell'utente
-        elif scelta == '2':
-            while True:
-                print("\n-- Aggiornamento Ticker Utente --")
-                email = input("Inserisci l'email dell'utente (o premi 'b' per tornare indietro): ")
-                if email.lower() == 'b':
-                    break
-                ticker = input("Inserisci il nuovo ticker dell'azione (o premi 'b' per tornare indietro): ")
-                if ticker.lower() == 'b':
-                    break
+    return jsonify({
+        'ticker': stock_response.ticker,
+        'value': stock_response.value,
+        'timestamp': stock_response.timestamp
+    })
 
-                # Inserimento dei parametri high_value e low_value
-                high_value, low_value = None, None
-                while True:
-                    print("Inserisci almeno uno dei seguenti valori (o premi 'b' per tornare indietro):")
-                    high_value_input = input("Valore massimo (high_value): ")
-                    low_value_input = input("Valore minimo (low_value): ")
+@app.route('/get_average_stock_value', methods=['POST'])
+def get_average_stock_value():
+    data = request.json
+    email = data.get('email')
+    count = data.get('count')
 
-                    if high_value_input.lower() == 'b' or low_value_input.lower() == 'b':
-                        break
+    if not count or not isinstance(count, int) or count <= 0:
+        return jsonify({'success': False, 'message': 'Il numero di valori per calcolare la media deve essere un numero intero positivo.'}), 200  # Success con messaggio di errore
 
-                    # Convertire i valori in float se forniti
-                    high_value = float(high_value_input) if high_value_input else None
-                    low_value = float(low_value_input) if low_value_input else None
+    stock_average_request = service_pb2.StockAverageRequest(email=email, count=count)
+    stock_average_response = stock_stub.GetAverageStockValue(stock_average_request)
 
-                    # Controllo: almeno uno dei due valori deve essere fornito
-                    if high_value is None and low_value is None:
-                        print("Errore: devi fornire almeno uno tra high_value e low_value.")
-                        continue
+    return jsonify({
+        'average': stock_average_response.average
+    })
 
-                    # Controllo: high_value deve essere maggiore di low_value se entrambi sono forniti
-                    if high_value is not None and low_value is not None and high_value <= low_value:
-                        print("Errore: il valore massimo (high_value) deve essere maggiore del valore minimo (low_value).")
-                        continue
+@app.route('/delete_user', methods=['POST'])
+def delete_user():
+    data = request.json
+    email = data.get('email')
 
-                    break  # Uscita dal ciclo se i valori sono validi
+    request_id = str(uuid.uuid4())
+    user_request = service_pb2.UserRequest(email=email, ticker="", request_id=request_id)
+    response = user_stub.DeleteUser(user_request)
 
-                # Se l'utente ha scelto di tornare indietro
-                if high_value_input.lower() == 'b' or low_value_input.lower() == 'b':
-                    break
-                #creazione della richiesta per l'aggiornamento del ticker
-                user_request = service_pb2.UserRequest(
-                    email=email,
-                    ticker=ticker,
-                    high_value=high_value if high_value is not None else 0.0,
-                    low_value=low_value if low_value is not None else 0.0,
-                    request_id=request_id
-                )
-                response = user_stub.UpdateUser(user_request)
-                print(f"Aggiornamento Utente: Success: {response.success}, Message: {response.message}")
-                break
+    return jsonify({
+        'success': response.success,
+        'message': response.message
+    })
 
-        elif scelta == '3':
-            while True:
-                print("\n-- Recupero Ultimo Valore Azione --")
-                email = input("Inserisci l'email dell'utente (o premi 'b' per tornare indietro): ")
-                if email.lower() == 'b':
-                    break
-                stock_request = service_pb2.StockRequest(email=email)
-                stock_response = stock_stub.GetLatestStockValue(stock_request)
-                print(f"Ultimo Valore Stock: Ticker: {stock_response.ticker}, Value: {stock_response.value}, Timestamp: {stock_response.timestamp}")
-                break  
-
-        elif scelta == '4':
-            while True:
-                print("\n-- Calcolo della Media degli Ultimi Valori Azionari --")
-                email = input("Inserisci l'email dell'utente (o premi 'b' per tornare indietro): ")
-                if email.lower() == 'b':
-                    break
-                count = input("Inserisci il numero di valori per calcolare la media (o premi 'b' per tornare indietro): ")
-                if count.lower() == 'b':
-                    break
-                if not count.isdigit():
-                    print("Errore: Devi inserire un numero valido.")
-                    continue
-                count = int(count)
-                stock_average_request = service_pb2.StockAverageRequest(email=email, count=count)
-                stock_average_response = stock_stub.GetAverageStockValue(stock_average_request)
-                print(f"Media degli ultimi {count} valori: {stock_average_response.average}")
-                break  
-
-        elif scelta == '5':
-            while True:
-                print("\n-- Cancellazione Utente --")
-                email = input("Inserisci l'email dell'utente da cancellare (o premi 'b' per tornare indietro): ")
-                if email.lower() == 'b':
-                    break
-                user_request = service_pb2.UserRequest(email=email, ticker="", request_id=request_id)
-                response = user_stub.DeleteUser(user_request)
-                print(f"Cancellazione Utente: Success: {response.success}, Message: {response.message}")
-                break  
-
-        elif scelta == '6':
-            print("Uscita dal programma...")
-            break
-
-        else:
-            print("Scelta non valida, per favore scegli tra 1 e 6.")
-
-if __name__ == "__main__":
-    run()
-
-
-
-
-
-
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)
 
 
 

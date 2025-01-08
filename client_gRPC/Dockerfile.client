@@ -1,0 +1,24 @@
+# Usa un'immagine di base con Python
+FROM python:3.10-slim
+
+# Imposta la directory di lavoro
+WORKDIR /app
+
+# Copia i file necessari nel container
+COPY . /app
+
+# Installa le dipendenze
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt
+
+RUN mkdir -p /app/templates
+COPY index.html /app/templates/index.html
+COPY service_pb2.py .
+COPY service_pb2_grpc.py .
+
+# Esponi la porta 5000 per Flask
+EXPOSE 5000
+
+# Esegui l'app Flask
+CMD ["python", "client_gRPC.py"]
+
