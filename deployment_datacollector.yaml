@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: data-collector
-          image: nunziofornitto/data-collector
+          image: nunziofornitto/data-collector #immagine presa da dockerhub, precedentemente pushata sia per datacollector sia per tutte le altre immagini personalizzate
           ports:
             - containerPort: 8002  #serviva dopo per prometheus
           env:
