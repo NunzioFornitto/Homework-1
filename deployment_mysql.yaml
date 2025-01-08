@@ -103,13 +103,13 @@ spec:
               value: "1234"  # Password utente
           ports:
             - containerPort: 3306
-          volumeMounts:
+          volumeMounts: #specifcando i volumi vengono montati, in quale path
             - name: mysql-data
-              mountPath: /var/lib/mysql  # Directory dei dati
+              mountPath: /var/lib/mysql  # Directory dei dati per mysql il path dove monto il volume
             - name: init-script
-              mountPath: /docker-entrypoint-initdb.d/db.sql
+              mountPath: /docker-entrypoint-initdb.d/db.sql # Path del file di inizializzazione
               subPath: db.sql
-      volumes:
+      volumes: #definisco due volumi uno persistentvolume per i dati e uno config map per lo script di inizializzaione uno persistente l'altro no
         - name: mysql-data
           persistentVolumeClaim:
             claimName: mysql-pvc
