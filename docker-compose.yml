@@ -19,7 +19,7 @@ services:
   flask-app:
     build:
       context: ./client_gRPC
-      dockerfile: Dockerfile.client  # Assicurati che il tuo Dockerfile si chiami "Dockerfile"
+      dockerfile: Dockerfile.client  
     container_name: flaskapp
     ports:
       - "5000:5000"  # Porta di Flask
@@ -115,7 +115,7 @@ services:
 
   # Servizio Prometheus
   prometheus:
-    image: prom/prometheus:v2.46.0  # Versione aggiornata di Prometheus
+    image: prom/prometheus:v2.46.0  
     volumes:
       - ./prometheus/:/etc/prometheus/
       - prometheus_data:/prometheus

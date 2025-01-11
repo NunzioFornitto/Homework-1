@@ -40,13 +40,13 @@ def listen_for_alerts():
     """
     Ascolta le notifiche nel topic 'to-alert-system' e verifica le condizioni di soglia per gli utenti.
     """
-    consumer.subscribe([topic_alert_system])  # Sottoscrivi al topic 'to-alert-system'
+    consumer.subscribe([topic_alert_system])  # Sottoscrivo al topic 'to-alert-system'
 
     while True:
         # Poll per i nuovi messaggi dal topic
         msg = consumer.poll(1.0)
         if msg is None:
-            continue  # Nessun messaggio ricevuto, continua a fare polling
+            continue  # Nessun messaggio ricevuto, continuo a fare polling
         if msg.error():
             print(f"Errore del consumer: {msg.error()}")
             continue

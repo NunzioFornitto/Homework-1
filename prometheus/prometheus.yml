@@ -22,10 +22,10 @@ scrape_configs:
     scrape_interval: 30s  # Intervallo di raccolta per il server gRPC
     static_configs:
       - targets:
-          - 'servergrpc:8000'  # Aggiungi il target del server gRPC sulla porta 8000
+          - 'servergrpc:8000'  # Aggiungo il target del server gRPC sulla porta 8000
   #job per raccogliere le metriche dal data collector
   - job_name: 'data_collector_exporter'  # Nome del job per il data collector
     scrape_interval: 30s  # Intervallo di raccolta per il data collector
     static_configs:
       - targets:
-          - 'datacollector:8002'  # Aggiungi il target del datacollectpr sulla porta 5000
+          - 'datacollector:8002'  # Aggiungo il target del datacollectpr sulla porta 8002

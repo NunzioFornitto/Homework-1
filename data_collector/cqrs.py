@@ -85,7 +85,7 @@ class UserWriteService:
             """
             updated_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             
-            # Passa i parametri nell'ordine corretto
+            
             cursor.execute(query, (command.ticker, updated_at, command.high_value, command.low_value, command.email))
             conn.commit()
 

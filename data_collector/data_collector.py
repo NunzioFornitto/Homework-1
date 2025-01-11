@@ -87,7 +87,7 @@ def delivery_report(err, msg):
 
 # Exporter Prometheus
 def start_exporter():
-    prometheus_client.start_http_server(8002)  # Esponi le metriche sulla porta 8000
+    prometheus_client.start_http_server(8002)  # Esposizione delle metriche sulla porta 8000
     print(f"Prometheus exporter running at http://{HOSTNAME}:8002/metrics")
     while True:
         time.sleep(1)
